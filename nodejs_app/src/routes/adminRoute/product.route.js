@@ -1,0 +1,10 @@
+const express = require("express");
+const route = express.Router();
+const upload = require("../../middleware/upload");
+const controller = require("../../controllers/admin/product.controller");
+route.get("/", controller.getAllProducts);
+route.get("/:id", controller.getProductById);
+route.post("/create", upload.array("images", 10), controller.createProduct);
+route.put("/edit/:id", upload.array("images", 10), controller.updateProduct);
+route.delete("/delete/:id", controller.deleteProduct);
+module.exports = route;
