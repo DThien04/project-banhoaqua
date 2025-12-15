@@ -1,0 +1,74 @@
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.logo {
+  font-weight: 800;
+  font-size: 20px;
+  text-decoration: none;
+  color: #111827;
+}
+
+.nav {
+  display: flex;
+  gap: 14px;
+}
+
+.link {
+  text-decoration: none;
+  color: #374151;
+  font-weight: 500;
+
+  &:hover {
+    color: #111827;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+.btnOutline {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #111827;
+  background: transparent;
+  color: #111827;
+  font-weight: 600;
+  text-decoration: none;
+
+  &:hover {
+    background: #111827;
+    color: #fff;
+  }
+}
+/* Header.module.scss */
+.userBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userName {
+  font-weight: 600;
+  color: #111827;
+  font-size: 14px;
+  white-space: nowrap;
+}
