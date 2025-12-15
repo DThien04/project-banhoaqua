@@ -1,55 +1,69 @@
 const Product = require("../models/product.model");
 const mongoose = require("mongoose");
 const { uploadImageService, deleteImageService } = require("./upload.service");
-
-module.exports.getAllProductsService = async (search, sort, page, limit) => {
+const buildProductQuery = require("../helpers/productQuery");
+module.exports.getAllProductsService = async (
+  search,
+  sort,
+  page,
+  limit,
+  extraFilter = {}
+) => {
   try {
-    const pageNum = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 10;
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 10;
     const skip = (pageNum - 1) * limitNum;
-    const query = {};
-    let sortOptions = { createdAt: -1 };
-    if (search) {
-      query.name = { $regex: search, $options: "i" };
-    }
 
-    switch (sort) {
-      case "name_asc":
-        sortOptions = { name: 1 };
-        break;
-      case "name_desc":
-        sortOptions = { name: -1 };
-        break;
-      case "price_asc":
-        sortOptions = { price: 1 };
-        break;
-      case "price_desc":
-        sortOptions = { price: -1 };
-        break;
-      case "countInStock_asc":
-        sortOptions = { countInStock: 1 };
-        break;
-      case "countInStock_desc":
-        sortOptions = { countInStock: -1 };
-        break;
-      case "":
-      default:
-        break;
-    }
+    const { onlyActiveCategory, ...productFilter } = extraFilter;
 
-    const totalItems = await Product.countDocuments(query);
-    const products = await Product.find(query)
-      .populate("category", "name")
+    const query = buildProductQuery({
+      search,
+      ...productFilter,
+    });
+
+    const sortMap = {
+      name_asc: { name: 1 },
+      name_desc: { name: -1 },
+      price_asc: { price: 1 },
+      price_desc: { price: -1 },
+      countInStock_asc: { countInStock: 1 },
+      countInStock_desc: { countInStock: -1 },
+    };
+
+    const sortOptions = sortMap[sort] || { createdAt: -1 };
+
+    let productQuery = Product.find(query)
       .select("-__v")
       .sort(sortOptions)
       .skip(skip)
       .limit(limitNum);
+
+    productQuery = productQuery.populate(
+      onlyActiveCategory
+        ? {
+            path: "category",
+            match: { isActive: true, isDeleted: false },
+            select: "name",
+          }
+        : { path: "category", select: "name" }
+    );
+
+    const products = await productQuery;
+
+    const finalProducts = onlyActiveCategory
+      ? products.filter((p) => p.category)
+      : products;
+
+    const totalItems = onlyActiveCategory
+      ? finalProducts.length
+      : await Product.countDocuments(query);
+
     return {
       EC: 0,
       EM: "Lấy danh sách sản phẩm thành công",
       DT: {
-        products: products,
-        totalItems: totalItems,
+        products: finalProducts,
+        totalItems,
         page: pageNum,
         limit: limitNum,
       },
@@ -66,6 +80,7 @@ module.exports.getAllProductsService = async (search, sort, page, limit) => {
     };
   }
 };
+
 module.exports.getProductByIdService = async (_id) => {
   if (!mongoose.Types.ObjectId.isValid(_id)) {
     return {
@@ -205,45 +220,45 @@ module.exports.deleteProductService = async (_id) => {
     return { EC: 1, EM: "ID sản phẩm không hợp lệ", DT: null };
   }
 
-  let publicIdToDelete = null;
-
   try {
-    const productToDelete = await Product.findById(_id).select("image");
+    const product = await Product.findById(_id);
 
-    if (!productToDelete) {
+    if (!product) {
       return { EC: 2, EM: "Không tìm thấy sản phẩm để xóa", DT: null };
     }
 
-    publicIdToDelete = productToDelete.image.publicId;
-
-    const deletedProduct = await Product.deleteOne({ _id });
-
-    if (deletedProduct.deletedCount === 0) {
-      return {
-        EC: 4,
-        EM: "Không thể xóa sản phẩm khỏi cơ sở dữ liệu.",
-        DT: null,
-      };
+    if (product.isDeleted) {
+      return { EC: 3, EM: "Sản phẩm đã bị xóa trước đó", DT: null };
     }
 
-    if (publicIdToDelete) {
-      await deleteImageService(publicIdToDelete);
-    }
+    product.isDeleted = true;
+    product.isActive = false;
+    await product.save();
 
-    return { EC: 0, EM: "Xóa sản phẩm thành công", DT: productToDelete };
+    return {
+      EC: 0,
+      EM: "Xóa sản phẩm thành công",
+      DT: product,
+    };
   } catch (error) {
     console.log("deleteProductService error:", error);
     return {
       EC: -1,
-      EM: "Lỗi server khi xóa sản phẩm" + error.message,
+      EM: "Lỗi server khi xóa sản phẩm",
       DT: null,
     };
   }
 };
-module.exports.getProductsByCategory = async (id) => {
+
+module.exports.getProductsByCategory = async (categoryId) => {
   try {
-    const products = await Product.find({ category: id })
-      .populate("category")
+    const query = buildProductQuery({
+      categoryId: categoryId,
+      isActive: true,
+    });
+
+    const products = await Product.find(query)
+      .populate("category", "name")
       .select("-__v")
       .sort({ createdAt: -1 });
 
@@ -253,11 +268,50 @@ module.exports.getProductsByCategory = async (id) => {
       DT: products,
     };
   } catch (error) {
-    console.log("getAllProductsService error:", error);
+    console.log("getProductsByCategory error:", error);
     return {
       EC: -1,
       EM: "Lỗi server khi lấy danh sách sản phẩm",
       DT: [],
+    };
+  }
+};
+module.exports.toggleProductActiveService = async (_id) => {
+  if (!mongoose.Types.ObjectId.isValid(_id)) {
+    return { EC: 1, EM: "ID sản phẩm không hợp lệ", DT: null };
+  }
+
+  try {
+    const product = await Product.findById(_id);
+
+    if (!product) {
+      return { EC: 2, EM: "Không tìm thấy sản phẩm", DT: null };
+    }
+
+    if (product.isDeleted) {
+      return {
+        EC: 3,
+        EM: "Sản phẩm đã bị xóa, không thể thay đổi trạng thái",
+        DT: null,
+      };
+    }
+
+    product.isActive = !product.isActive;
+    await product.save();
+
+    return {
+      EC: 0,
+      EM: product.isActive
+        ? "Kích hoạt sản phẩm thành công"
+        : "Ngừng bán sản phẩm thành công",
+      DT: product,
+    };
+  } catch (error) {
+    console.log("toggleProductActiveService error:", error);
+    return {
+      EC: -1,
+      EM: "Lỗi server khi thay đổi trạng thái sản phẩm",
+      DT: null,
     };
   }
 };

@@ -101,3 +101,17 @@ module.exports.deleteProduct = async (req, res) => {
     handleServerError(res, error, "deleteProduct controller");
   }
 };
+module.exports.toggleProductActive = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await productService.toggleProductActiveService(id);
+
+    if (result.EC !== 0) {
+      return res.status(404).json(result);
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+    handleServerError(res, error, "toggleProductActive controller");
+  }
+};

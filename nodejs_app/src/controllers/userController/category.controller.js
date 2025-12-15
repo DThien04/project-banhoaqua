@@ -5,7 +5,8 @@ const {
 const handleServerError = require("../../helpers/handleServerError");
 module.exports.getAllCategories = async (req, res) => {
   try {
-    const result = await getAllCategoriesService();
+    const filter = { isActive: true };
+    const result = await getAllCategoriesService(filter);
     return res.status(200).json(result);
   } catch (error) {
     handleServerError(res, error, "getAllCategories controller");

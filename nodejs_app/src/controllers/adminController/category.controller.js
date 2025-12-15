@@ -1,15 +1,9 @@
-const {
-  getAllCategoriesService,
-  getCategoryById,
-  createNewCategoryService,
-  updateCategoryService,
-  deleteCategoryService,
-} = require("../../services/category.service");
+const categoryService = require("../../services/category.service");
 const handleServerError = require("../../helpers/handleServerError");
 module.exports.getAllCategories = async (req, res) => {
   const { search, sort, page, limit } = req.query;
   try {
-    const result = await getAllCategoriesService(search, sort, page, limit);
+    const result = await categoryService.getAllCategoriesService(search, sort, page, limit);
     return res.status(200).json(result);
   } catch (error) {
     handleServerError(res, error, "getAllCategories controller");
@@ -19,7 +13,7 @@ module.exports.getAllCategories = async (req, res) => {
 module.exports.getCategoryDetails = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await getCategoryById(id);
+    const result = await categoryService.getCategoryById(id);
 
     if (result.EC === 0 && !result.DT) {
       return res.status(404).json({
@@ -37,10 +31,10 @@ module.exports.getCategoryDetails = async (req, res) => {
 
 module.exports.createNewCategory = async (req, res) => {
   console.log(req.body);
-  const { categoryName } = req.body;
+  const { categoryName, type } = req.body;
 
   try {
-    const result = await createNewCategoryService(categoryName);
+    const result = await categoryService.createNewCategoryService(categoryName, type);
 
     if (result.EC === 1) {
       return res.status(400).json(result);
@@ -57,9 +51,9 @@ module.exports.createNewCategory = async (req, res) => {
 
 module.exports.updateCategory = async (req, res) => {
   const { id } = req.params;
-  const { categoryName } = req.body;
+  const { categoryName, newType } = req.body;
   try {
-    const result = await updateCategoryService(id, categoryName);
+    const result = await categoryService.updateCategoryService(id, categoryName, newType);
 
     if (result.EC === 1) {
       return res.status(400).json(result);
@@ -80,7 +74,7 @@ module.exports.updateCategory = async (req, res) => {
 module.exports.deleteCategory = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await deleteCategoryService(id);
+    const result = await categoryService.deleteCategoryService(id);
 
     if (result.EC === 1) {
       return res.status(400).json(result);
@@ -92,5 +86,20 @@ module.exports.deleteCategory = async (req, res) => {
     return res.status(200).json(result);
   } catch (error) {
     handleServerError(res, error, "deleteCategory controller");
+  }
+};
+module.exports.toggleCategoryActive = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await categoryService.toggleCategoryActiveService(id);
+
+    if (result.EC !== 0) {
+      return res.status(400).json(result);
+    }
+
+    return res.status(200).json(result);
+  } catch (error) {
+    handleServerError(res, error, "toggleCategoryActive controller");
   }
 };
